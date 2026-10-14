@@ -74,7 +74,7 @@
       location.href='app.html?browserDemo=1';
     });
     continueButton.addEventListener('click',()=>{location.href='app.html?browserDemo=1';});
-    async function current(){try{const response=await fetch('/v1/demo/status',{credentials:'same-origin',cache:'no-store'});const body=await response.json().catch(()=>({}));if(response.ok&&body.active){startButton.classList.add('hidden');continueButton.classList.remove('hidden');remainingAtSync=Number(body.remainingMs)||0;monotonicSync=performance.now();updateCountdown();if(!countdownTimer)countdownTimer=setInterval(updateCountdown,1000);return;}if(response.status===410){markTrialExpired();return;}startButton.classList.remove('hidden');continueButton.classList.add('hidden');if(params.has('start'))status.textContent='اضغط على الزر لبدء تجربة الساعتين.';}
+    async function current(){try{const response=await fetch('/v1/demo/status',{credentials:'same-origin',cache:'no-store'});const body=await response.json().catch(()=>({}));if(response.ok&&body.active){location.replace('app.html?browserDemo=1');return;}if(response.status===410){markTrialExpired();return;}startButton.classList.remove('hidden');continueButton.classList.add('hidden');if(params.has('start'))status.textContent='اضغط على الزر لبدء تجربة الساعتين.';}
       catch(_){status.textContent='تحقق من اتصال الإنترنت ثم أعد المحاولة.';}}
     setInterval(current,60_000);
     if(params.has('expired'))markTrialExpired();
