@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090909">
+  <title>تجربة APL GYM</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 0,#facc1518,transparent 38%),#090909;color:#f5f5f5;font:16px "Segoe UI",Arial,sans-serif}.card{width:min(100%,640px);padding:48px 36px;border:1px solid #6b5600;border-radius:28px;background:linear-gradient(150deg,#1b1b1b,#101010);text-align:center;box-shadow:0 24px 80px #0009}.mark{width:82px;height:82px;margin:0 auto 22px;display:grid;place-items:center;border-radius:24px;background:#facc15;color:#090909;font-weight:900;font-size:28px;box-shadow:0 12px 40px #facc1530}.tag{color:#facc15;font-size:14px;font-weight:700}h1{margin:10px 0;font-size:34px}p{color:#b8b8b8;line-height:1.9}.features{margin:24px auto;padding:0;list-style:none;display:grid;gap:10px;text-align:right;color:#ddd}.features li::before{content:"✓";color:#facc15;font-weight:800;margin-left:10px}.field{display:block;width:100%;margin-top:12px;padding:15px 16px;border:1px solid #454545;border-radius:13px;background:#101010;color:#fff;text-align:left;font-size:16px;direction:ltr}.button{display:block;margin-top:14px;width:100%;padding:16px;border:0;border-radius:13px;background:#facc15;color:#111;font-size:17px;font-weight:800;cursor:pointer}.button:disabled{opacity:.6;cursor:wait}.note{min-height:24px;margin-top:14px;color:#facc15;font-size:14px}.small{margin-top:20px;font-size:13px;color:#888}.hidden{display:none!important}@media(max-width:520px){.card{padding:34px 22px}h1{font-size:28px}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">APL</div>
+    <div class="tag">إدارة صالتك الرياضية ببساطة</div>
+    <h1>APL GYM</h1>
+    <p id="intro">ابدأ التجربة المجانية مباشرة من هذا المتصفح لمدة ساعتين.</p>
+    <ul class="features">
+      <li>لا تحتاج إلى تسجيل دخول أو إنشاء حساب</li>
+      <li>بيانات التجربة منفصلة تمامًا عن ملفات برنامج Windows</li>
+      <li>تبدأ مدة الساعتين عند الضغط على زر بدء التجربة</li>
+    </ul>
+    <button class="button" id="startTrial" type="button">ابدأ التجربة المجانية لمدة ساعتين</button>
+    <button class="button hidden" id="continueTrial" type="button">متابعة التجربة</button>
+    <div class="note" id="status" role="status" aria-live="polite"></div>
+    <div class="small">ترتبط التجربة بملف تعريف هذا المتصفح. مسح بيانات الموقع أو استخدام متصفح آخر قد يبدأ تجربة جديدة.</div>
+  </main>
+  <script>
+    const status=document.getElementById('status');
+    const startButton=document.getElementById('startTrial');
+    const continueButton=document.getElementById('continueTrial');
+    const params=new URLSearchParams(location.search);
+    let busy=false;
+    let remainingAtSync=0;
+    let monotonicSync=performance.now();
+    let countdownTimer=null;
+    function markTrialExpired(){
+      document.getElementById('intro').textContent='انتهت التجربة المجانية لهذا المتصفح.';
+      status.textContent='يمكنك متابعة استخدام نسخة Windows.';
+      startButton.classList.add('hidden');continueButton.classList.add('hidden');
+      if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null;}
+    }
+    function updateCountdown(){
+      const remaining=remainingAtSync-(performance.now()-monotonicSync);
+      if(remaining<=0){markTrialExpired();return;}
+      const totalSeconds=Math.ceil(remaining/1000);
+      const hours=String(Math.floor(totalSeconds/3600)).padStart(2,'0');
+      const minutes=String(Math.floor((totalSeconds%3600)/60)).padStart(2,'0');
+      const seconds=String(totalSeconds%60).padStart(2,'0');
+      status.textContent=`تجربتك مفعّلة — الوقت المتبقي ${hours}:${minutes}:${seconds}`;
+    }
+    function browserTrialId(){
+      const key='apl_gym_browser_trial_id';
+      let id=localStorage.getItem(key);
+      if(!/^[a-f0-9]{64}$/i.test(id||'')){
+        id=Array.from(crypto.getRandomValues(new Uint8Array(32)),byte=>byte.toString(16).padStart(2,'0')).join('');
+        localStorage.setItem(key,id);
+      }
+      return id;
+    }
+    async function post(path,payload,button){
+      if(busy)return null;busy=true;if(button)button.disabled=true;
+      try{const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{}),cache:'no-store'});const body=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(body.reason||'تعذر إكمال الطلب');error.status=response.status;throw error;}return body;}
+      catch(error){if(error.status===410)markTrialExpired();else status.textContent=error.message||'تعذر الاتصال بالخادم. حاول لاحقًا.';return null;}
+      finally{busy=false;if(button)button.disabled=false;}
+    }
+    startButton.addEventListener('click',async()=>{
+      status.textContent='جارٍ بدء التجربة…';
+      let browserId;
+      try{browserId=browserTrialId();}catch(_){status.textContent='يجب تفعيل ملفات الموقع في المتصفح لبدء التجربة.';return;}
+      const result=await post('/v1/demo/start',{browserId},startButton);
+      if(!result)return;
+      if(!result.active){markTrialExpired();return;}
+      location.href='index.html?browserDemo=1';
+    });
+    continueButton.addEventListener('click',()=>{location.href='index.html?browserDemo=1';});
+    async function current(){try{const response=await fetch('/v1/demo/status',{credentials:'same-origin',cache:'no-store'});const body=await response.json().catch(()=>({}));if(response.ok&&body.active){startButton.classList.add('hidden');continueButton.classList.remove('hidden');remainingAtSync=Number(body.remainingMs)||0;monotonicSync=performance.now();updateCountdown();if(!countdownTimer)countdownTimer=setInterval(updateCountdown,1000);return;}if(response.status===410){markTrialExpired();return;}startButton.classList.remove('hidden');continueButton.classList.add('hidden');if(params.has('start'))status.textContent='اضغط على الزر لبدء تجربة الساعتين.';}
+      catch(_){status.textContent='تحقق من اتصال الإنترنت ثم أعد المحاولة.';}}
+    setInterval(current,60_000);
+    if(params.has('expired'))markTrialExpired();
+    current();
+  </script>
+</body>
+</html>
